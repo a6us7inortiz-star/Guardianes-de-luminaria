@@ -113,4 +113,12 @@ function joyEnd(e){if(e)e.preventDefault();joy.x=joy.y=0;joy.on=false;document.g
 let je=document.getElementById('joy');je.addEventListener('touchstart',e=>{e.preventDefault();let t=e.touches[0];joySet(t.clientX,t.clientY)},{passive:false});je.addEventListener('touchmove',e=>{e.preventDefault();let t=e.touches[0];joySet(t.clientX,t.clientY)},{passive:false});je.addEventListener('touchend',joyEnd,{passive:false});je.addEventListener('touchcancel',joyEnd,{passive:false});
 document.getElementById('attack').addEventListener('touchstart',e=>{e.preventDefault();attack()},{passive:false});document.getElementById('dash').addEventListener('touchstart',e=>{e.preventDefault();dash()},{passive:false});
 document.getElementById('attack').onclick=attack;document.getElementById('dash').onclick=dash;
-</script></body></html>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./pwabuilder-sw.js');
+  });
+}
+</script>
+ </body></html>
