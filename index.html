@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Guardianes de Lúmina — 100 niveles</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050b14;color:#fff;font-family:system-ui,-apple-system,sans-serif;touch-action:none}
+#game{position:fixed;inset:0;width:100%;height:100%}
+#hud{position:fixed;top:max(9px,env(safe-area-inset-top));left:8px;right:8px;display:flex;gap:5px;justify-content:space-between;z-index:5;pointer-events:none}
+.box{background:#07101dcc;border:1px solid #8adfff45;border-radius:11px;padding:6px 8px;font-weight:800;font-size:12px;backdrop-filter:blur(4px)}
+#bar{position:fixed;top:49px;left:9%;right:9%;height:7px;background:#071018cc;border-radius:10px;z-index:5;overflow:hidden}
+#bar>i{display:block;height:100%;width:0;background:#76e7ff;border-radius:10px}
+#msg{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:7;background:#07101de8;padding:8px 14px;border-radius:12px;opacity:0;transition:.2s;pointer-events:none;text-align:center;white-space:nowrap}
+#controls{position:fixed;inset:0;z-index:8;pointer-events:none}
+#joy{position:absolute;left:20px;bottom:max(22px,env(safe-area-inset-bottom));width:135px;height:135px;border-radius:50%;background:#07101d99;border:2px solid #b4d8e855;pointer-events:auto}
+#knob{position:absolute;width:55px;height:55px;left:39px;top:39px;border-radius:50%;background:#bfefff99}
+.action{position:absolute;right:22px;width:72px;height:72px;border-radius:50%;border:2px solid #b4d8e855;background:#07101dcc;color:#fff;font-size:27px;pointer-events:auto}
+#attack{bottom:max(32px,env(safe-area-inset-bottom))}
+#dash{bottom:max(120px,calc(env(safe-area-inset-bottom) + 88px));right:102px;font-size:23px}
+#screen{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#193d50,#040912 67%);text-align:center}
+.card{width:min(90%,540px);max-height:92vh;overflow:auto;padding:26px;border:1px solid #86dfff55;border-radius:24px;background:#07101ddd;box-shadow:0 20px 80px #000}
+h1{font-size:clamp(32px,9vw,62px);margin:0 0 5px;color:#bdefff;text-shadow:0 0 25px #4ddaff}
+p{line-height:1.45;color:#bfd0db}.start{padding:14px 25px;border:0;border-radius:14px;background:#7fe1ff;color:#041018;font-weight:900;font-size:17px}
+.small{font-size:12px;color:#8299a8;margin-top:13px}
+#levels{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin:16px 0}
+.lv{font-size:11px;padding:6px 2px;border-radius:6px;background:#10202b;color:#7e9aaa}.lv.done{background:#164759;color:#a9efff}.lv.now{outline:2px solid #8ceeff;color:#fff}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+ <div class="box">❤️ <span id="hp">5</span></div><div class="box">🌌 Nv. <span id="level">1</span>/100</div>
+ <div class="box">💠 <span id="shards">0</span></div><div class="box">👾 <span id="kills">0</span></div><div class="box">⭐ <span id="score">0</span></div>
+</div>
+<div id="bar"><i id="progress"></i></div><div id="msg"></div>
+<div id="controls"><div id="joy"><div id="knob"></div></div><button class="action" id="dash">💨</button><button class="action" id="attack">⚔️</button></div>
+<div id="screen"><div class="card" id="card">
+<h1>🌌 Guardianes de Lúmina</h1>
+<p><b>100 niveles.</b> Recupera los fragmentos, derrota a las sombras y llega al portal. Cada nivel aumenta la dificultad; los niveles 10, 20, 30… tienen un guardián especial.</p>
+<button class="start" id="play">Comenzar</button>
+<div class="small">📱 Joystick · ⚔️ atacar · 💨 esquivar</div>
+</div></div>
+<script>
+const C=document.getElementById('game'),ctx=C.getContext('2d');let W,H,dpr,game=false,last=0,shake=0;
+let p,enemies,items,portal,particles,hp,level,shards,kills,score,attackCd,dashCd,inv,need,got,spawn,timer,boss;
+let joy={x:0,y:0,on:false},keys={};
+
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;C.width=W*dpr;C.height=H*dpr;C.style.width=W+'px';C.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}
+addEventListener('resize',resize);resize();
+const R=(a,b)=>Math.random()*(b-a)+a,D=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+function say(t){let m=document.getElementById('msg');m.textContent=t;m.style.opacity=1;clearTimeout(m.t);m.t=setTimeout(()=>m.style.opacity=0,1200)}
+function makeLevel(n){
+ level=n;need=Math.min(12,4+Math.floor(n/10));got=0;spawn=0;timer=0;attackCd=0;dashCd=0;inv=.4;
+ p={x:W/2,y:H/2,r:15,s:205+Math.min(n,70)*.3};portal={x:W-60,y:H-75,r:27};
+ enemies=[];items=[];particles=[];boss=null;
+ let count=3+Math.floor(n*.16)+Math.floor(n/12);
+ for(let i=0;i<need;i++)items.push({x:R(45,W-45),y:R(85,H-45),r:10,type:'shard',phase:R(0,6)});
+ for(let i=0;i<Math.min(3+Math.floor(n/12),8);i++)items.push({x:R(45,W-45),y:R(85,H-45),r:10,type:'heart',phase:R(0,6)});
+ for(let i=0;i<count;i++)spawnEnemy(true);
+ if(n%10===0){boss={x:R(W*.55,W-70),y:R(100,H-100),r:31,hp:5+Math.floor(n/10)*2,max:5+Math.floor(n/10)*2,s:35+n*.25};say('👹 ¡GUARDIÁN DEL NIVEL '+n+'!')}
+ say('Nivel '+n+' · recoge '+need+' fragmentos');
+}
+function spawnEnemy(safe){
+ let e={x:R(30,W-30),y:R(80,H-30),r:R(12,17),s:R(48,68)+level*.35,type:Math.random()<Math.min(.4,.12+level*.006)?'fast':'normal',hp:1};
+ if(safe&&D(e,p)<170){e.x=40;e.y=95} enemies.push(e)
+}
+function burst(x,y,n=10,k='hit'){for(let i=0;i<n;i++)particles.push({x,y,vx:R(-110,110),vy:R(-110,110),life:R(.2,.65),k})}
+function hurt(){if(inv>0)return;hp--;inv=1.05;shake=8;burst(p.x,p.y,16,'hurt');say('💥 ¡Te alcanzaron!');p.x=W/2;p.y=H/2;if(hp<=0)end('🌑 Has caído','Llegaste al nivel '+level+' · Puntuación '+score)}
+function attack(){
+ if(!game||attackCd>0)return;attackCd=.34;burst(p.x,p.y,6,'spark');
+ for(let i=enemies.length-1;i>=0;i--){let e=enemies[i];if(D(p,e)<78){e.hp--;burst(e.x,e.y,10,'hit');if(e.hp<=0){kills++;score+=100;enemies.splice(i,1)}}}
+ if(boss&&D(p,boss)<90){boss.hp--;burst(boss.x,boss.y,20,'spark');score+=80;if(boss.hp<=0){score+=1000;say('👑 ¡GUARDIÁN DERROTADO!');burst(boss.x,boss.y,35,'spark');boss=null}}
+}
+function dash(){if(!game||dashCd>0)return;dashCd=1.15;inv=.5;let dx=joy.x,dy=joy.y;if(!dx&&!dy)dx=1;let n=Math.hypot(dx,dy)||1;p.x=cl(p.x+dx/n*125,25,W-25);p.y=cl(p.y+dy/n*125,80,H-25);burst(p.x,p.y,18,'dash')}
+function update(dt){
+ attackCd=Math.max(0,attackCd-dt);dashCd=Math.max(0,dashCd-dt);inv=Math.max(0,inv-dt);timer+=dt;
+ let dx=joy.on?joy.x:(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=joy.on?joy.y:(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+ if(dx||dy){let n=Math.hypot(dx,dy);p.x+=dx/n*p.s*dt;p.y+=dy/n*p.s*dt}
+ p.x=cl(p.x,24,W-24);p.y=cl(p.y,78,H-25);
+ enemies.forEach(e=>{let dx=p.x-e.x,dy=p.y-e.y,n=Math.hypot(dx,dy)||1;e.x+=dx/n*e.s*dt;e.y+=dy/n*e.s*dt;if(D(p,e)<p.r+e.r)hurt()});
+ if(boss){let dx=p.x-boss.x,dy=p.y-boss.y,n=Math.hypot(dx,dy)||1;boss.x+=dx/n*boss.s*dt;boss.y+=dy/n*boss.s*dt;if(D(p,boss)<p.r+boss.r)hurt()}
+ for(let i=items.length-1;i>=0;i--){let it=items[i];if(D(p,it)<p.r+it.r+7){if(it.type==='shard'){got++;score+=150;say('💠 Fragmento '+got+'/'+need)}else{hp=Math.min(5,hp+1);score+=60;say('❤️ Vida recuperada')}burst(it.x,it.y,13,'spark');items.splice(i,1)}}
+ spawn+=dt;if(spawn>Math.max(1.7,4.5-level*.025)){spawn=0;spawnEnemy(false)}
+ for(let i=particles.length-1;i>=0;i--){let q=particles[i];q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.97;q.vy*=.97;q.life-=dt;if(q.life<=0)particles.splice(i,1)}
+ document.getElementById('progress').style.width=(got/need*100)+'%';
+ if(got>=need&&!boss&&D(p,portal)<p.r+portal.r){score+=500+level*50;if(level>=100)end('🏆 ¡NIVEL 100!','Has dominado Lúmina · Puntuación '+score);else{makeLevel(level+1);hp=Math.min(5,hp+1)}}
+ document.getElementById('hp').textContent=hp;document.getElementById('level').textContent=level;document.getElementById('shards').textContent=got+'/'+need;document.getElementById('kills').textContent=kills;document.getElementById('score').textContent=score;
+}
+function draw(){
+ ctx.save();if(shake){ctx.translate(R(-shake,shake),R(-shake,shake));shake*=.86}
+ ctx.fillStyle='#07121c';ctx.fillRect(0,0,W,H);
+ let hue=level%10;ctx.fillStyle=hue<4?'#0b2025':hue<7?'#101b2a':'#1b1629';ctx.globalAlpha=.9;ctx.fillRect(0,78,W,H-78);ctx.globalAlpha=1;
+ for(let y=78;y<H;y+=42)for(let x=0;x<W;x+=42){ctx.fillStyle=((x/42+y/42)%2?'#0b1d25':'#0c2228');ctx.fillRect(x,y,42,42)}
+ ctx.strokeStyle='#12333a';ctx.lineWidth=22;ctx.beginPath();ctx.moveTo(-30,H*.72);ctx.bezierCurveTo(W*.25,H*.55,W*.7,H*.85,W+30,H*.61);ctx.stroke();
+ for(let i=0;i<30;i++){let tx=(i*113)%W+15,ty=92+(i*71)%(Math.max(100,H-115));ctx.fillStyle='#102d29';ctx.fillRect(tx-5,ty,10,24);ctx.fillStyle='#153b31';ctx.beginPath();ctx.arc(tx,ty,20,0,7);ctx.fill()}
+ ctx.shadowBlur=got>=need&&!boss?24:7;ctx.shadowColor='#60e7ff';ctx.strokeStyle=got>=need&&!boss?'#9bf4ff':'#36535b';ctx.lineWidth=6;ctx.beginPath();ctx.arc(portal.x,portal.y,portal.r,0,7);ctx.stroke();ctx.shadowBlur=0;
+ items.forEach(it=>{let yy=it.y+Math.sin(performance.now()/330+it.phase)*3;ctx.shadowBlur=14;ctx.shadowColor=it.type==='shard'?'#5ce5ff':'#ff6d7d';ctx.fillStyle=it.type==='shard'?'#79edff':'#ff7382';ctx.beginPath();ctx.arc(it.x,yy,it.r,0,7);ctx.fill();ctx.shadowBlur=0});
+ enemies.forEach(e=>{ctx.fillStyle=e.type==='fast'?'#482052':'#281d35';ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,7);ctx.fill();ctx.fillStyle='#ef9dff';ctx.fillRect(e.x-7,e.y-3,4,4);ctx.fillRect(e.x+3,e.y-3,4,4)});
+ if(boss){ctx.shadowBlur=20;ctx.shadowColor='#ff4c88';ctx.fillStyle='#501b43';ctx.beginPath();ctx.arc(boss.x,boss.y,boss.r,0,7);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#ff91bd';ctx.fillRect(boss.x-10,boss.y-5,6,5);ctx.fillRect(boss.x+4,boss.y-5,6,5);ctx.fillStyle='#280e1e';ctx.fillRect(boss.x-32,boss.y-45,64,6);ctx.fillStyle='#ff5c91';ctx.fillRect(boss.x-32,boss.y-45,64*(boss.hp/boss.max),6)}
+ ctx.globalAlpha=inv>0&&Math.floor(inv*14)%2?.3:1;ctx.fillStyle='#e1faff';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();ctx.fillStyle='#55dfff';ctx.beginPath();ctx.arc(p.x-3,p.y-5,5,0,7);ctx.fill();ctx.globalAlpha=1;
+ if(attackCd>.08){ctx.strokeStyle='#9ff4ff';ctx.lineWidth=5;ctx.beginPath();ctx.arc(p.x,p.y,58,0,7);ctx.stroke()}
+ particles.forEach(q=>{ctx.globalAlpha=Math.max(0,q.life);ctx.fillStyle=q.k==='hurt'?'#ff6078':q.k==='dash'?'#8eeeff':'#b9f7ff';ctx.fillRect(q.x,q.y,4,4)});ctx.globalAlpha=1;ctx.restore();
+}
+function end(title,text){game=false;document.getElementById('screen').style.display='flex';document.getElementById('card').innerHTML='<h1>'+title+'</h1><p>'+text+'</p><button class="start" onclick="location.reload()">Jugar de nuevo</button>'}
+function start(){document.getElementById('screen').style.display='none';hp=5;shards=0;kills=0;score=0;makeLevel(1);game=true;last=performance.now();requestAnimationFrame(loop)}
+function loop(t){if(!game)return;let dt=Math.min(.035,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(loop)}
+document.getElementById('play').onclick=start;
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key===' '){e.preventDefault();attack()}});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function joySet(x,y){let r=document.getElementById('joy').getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,m=43,dx=x-cx,dy=y-cy,n=Math.hypot(dx,dy)||1;if(n>m){dx=dx/n*m;dy=dy/n*m}joy.x=dx/m;joy.y=dy/m;joy.on=true;document.getElementById('knob').style.transform='translate('+dx+'px,'+dy+'px)'}
+function joyEnd(e){if(e)e.preventDefault();joy.x=joy.y=0;joy.on=false;document.getElementById('knob').style.transform='translate(0,0)'}
+let je=document.getElementById('joy');je.addEventListener('touchstart',e=>{e.preventDefault();let t=e.touches[0];joySet(t.clientX,t.clientY)},{passive:false});je.addEventListener('touchmove',e=>{e.preventDefault();let t=e.touches[0];joySet(t.clientX,t.clientY)},{passive:false});je.addEventListener('touchend',joyEnd,{passive:false});je.addEventListener('touchcancel',joyEnd,{passive:false});
+document.getElementById('attack').addEventListener('touchstart',e=>{e.preventDefault();attack()},{passive:false});document.getElementById('dash').addEventListener('touchstart',e=>{e.preventDefault();dash()},{passive:false});
+document.getElementById('attack').onclick=attack;document.getElementById('dash').onclick=dash;
+</script></body></html>
