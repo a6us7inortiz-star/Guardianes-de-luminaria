@@ -10,12 +10,19 @@
   "theme_color": "#ffffff",
   "lang": "es",
   "description": "Guardianes de Lúmina es un juego de acción y aventura con 100 niveles, desafíos y enemigos cada vez más difíciles.",
+  "id": "/Guardianes-de-luminaria/",
   "icons": [
     {
       "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
