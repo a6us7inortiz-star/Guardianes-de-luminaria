@@ -112,8 +112,8 @@ addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 function joySet(x,y){let r=document.getElementById('joy').getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,m=43,dx=x-cx,dy=y-cy,n=Math.hypot(dx,dy)||1;if(n>m){dx=dx/n*m;dy=dy/n*m}joy.x=dx/m;joy.y=dy/m;joy.on=true;document.getElementById('knob').style.transform='translate('+dx+'px,'+dy+'px)'}
 function joyEnd(e){if(e)e.preventDefault();joy.x=joy.y=0;joy.on=false;document.getElementById('knob').style.transform='translate(0,0)'}
 let je=document.getElementById('joy');je.addEventListener('touchstart',e=>{e.preventDefault();let t=e.touches[0];joySet(t.clientX,t.clientY)},{passive:false});je.addEventListener('touchmove',e=>{e.preventDefault();let t=e.touches[0];joySet(t.clientX,t.clientY)},{passive:false});je.addEventListener('touchend',joyEnd,{passive:false});je.addEventListener('touchcancel',joyEnd,{passive:false});
-document.getElementById('attack').addEventListener('touchstart',e=>{e.preventDefault();attack()},{passive:false});document.getElementById('dash').addEventListener('touchstart',e=>{e.preventDefault();dash()},{passive:false});
 document.getElementById('attack').onclick=attack;document.getElementById('dash').onclick=dash;
+</script>
 
 <script>
 if ('serviceWorker' in navigator) {
@@ -122,4 +122,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
- </body></html>
+</body>
+</html>
